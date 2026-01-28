@@ -14,36 +14,34 @@ st.title("Land Constraint Checker")
 
 # ---- CONFIG ----
 BASE_GEOPACKAGES = [
-    {
-        'path': 'custom_repository/data/Sensitive_Parties.gpkg',
-        'layers': ['canals_on_the_trust_network', 'dry_docks', 'network_rail_centre_lines', 'nwr_elrs'],
-        'colors': ['pink', 'lightblue', 'lightgreen', 'beige']
-    },
-    {
-        'path': 'custom_repository/data/Environmental_Designations.gpkg',
-        'layers': ['aonb', 'country_parks', 'local_nature_reserves', 'national_nature_reserves',
-                   'national_parks', 'ramsar', 'sac', 'spa', 'sssi'],
-        'colors': ['blue', 'red', 'green', 'purple', 'orange', 'darkblue', 'darkred', 'darkgreen', 'cadetblue']
-    },
-    {
-        'path': 'custom_repository/data/Special_Category_Land.gpkg',
-        'layers': ['conservation_areas', 'crow_act_2000', 'national_trust_land_always_open',
-                   'national_trust_limited_access', 'open_greenspace'],
-        'colors': ['gray', 'black', 'brown', 'cyan', 'magenta']
-    }
+    {'path':'custom_repository/data/AONB.gpkg','layers':['environmental_designations__aonb'], 'colors':['blue'], 'display_name':'AONB'},
+    {'path':'custom_repository/data/Conservation_areas.gpkg','layers':['special_category_land__conservation_areas'], 'colors':['gray'], 'display_name':'Conservation Areas'},
+    {'path':'custom_repository/data/Country_parks.gpkg','layers':['environmental_designations__country_parks'], 'colors':['red'], 'display_name':'Country Parks'},
+    {'path':'custom_repository/data/Crow_act_2000.gpkg','layers':['special_category_land__crow_act_2000'], 'colors':['black'], 'display_name':'CROW Act 2000'},
+    {'path':'custom_repository/data/Local_nature_reserves.gpkg','layers':['environmental_designations__local_nature_reserves'], 'colors':['green'], 'display_name':'Local Nature Reserves'},
+    {'path':'custom_repository/data/National_nature_reserves.gpkg','layers':['environmental_designations__national_nature_reserves'], 'colors':['purple'], 'display_name':'National Nature Reserves'},
+    {'path':'custom_repository/data/National_parks.gpkg','layers':['environmental_designations__national_parks'], 'colors':['orange'], 'display_name':'National Parks'},
+    {'path':'custom_repository/data/National_trust_land_always_open.gpkg','layers':['special_category_land__national_trust_land_always_open'], 'colors':['brown'], 'display_name':'National Trust (Always Open)'},
+    {'path':'custom_repository/data/National_trust_land_limited_access.gpkg','layers':['special_category_land__national_trust_limited_access'], 'colors':['cyan'], 'display_name':'National Trust (Limited Access)'},
+    {'path':'custom_repository/data/Open_greenspace.gpkg','layers':['special_category_land__open_greenspace'], 'colors':['magenta'], 'display_name':'Open Greenspace'},
+    {'path':'custom_repository/data/RAMSAR.gpkg','layers':['environmental_designations__ramsar'], 'colors':['darkblue'], 'display_name':'RAMSAR'},
+    {'path':'custom_repository/data/SAC.gpkg','layers':['environmental_designations__sac'], 'colors':['darkred'], 'display_name':'SAC'},
+    {'path':'custom_repository/data/Sensitive_Parties.gpkg','layers':['canals_on_the_trust_network', 'dry_docks', 'network_rail_centre_lines', 'nwr_elrs'], 'colors':['pink', 'lightblue', 'lightgreen', 'beige'], 'display_name':'Sensitive Parties'},
+    {'path':'custom_repository/data/SPA.gpkg','layers':['environmental_designations__spa'], 'colors':['darkgreen'], 'display_name':'SPA'},
+    {'path':'custom_repository/data/SSSI.gpkg','layers':['environmental_designations__sssi'], 'colors':['cadetblue'], 'display_name':'SSSI'},
 ]
 
 COLOR_MAP = {
     'blue':[0,0,255,140], 'red':[255,0,0,140], 'green':[0,255,0,140], 'purple':[128,0,128,140],
     'orange':[255,165,0,140], 'darkblue':[0,0,139,140], 'darkred':[139,0,0,140], 'darkgreen':[0,100,0,140],
-    'cadetblue':[95,158,160,140], 'pink':[255,192,203,140], 'lightblue':[173,216,230,140],
-    'lightgreen':[144,238,144,140], 'beige':[245,245,220,140], 'gray':[128,128,128,140],
-    'black':[0,0,0,140], 'brown':[165,42,42,140], 'cyan':[0,255,255,140], 'magenta':[255,0,255,140]
+    'cadetblue':[95,158,160,140], 'pink':[255,192,203,140], 'gray':[128,128,128,140],
+    'black':[0,0,0,140], 'brown':[165,42,42,140], 'cyan':[0,255,255,140], 'magenta':[255,0,255,140],
+    'lightblue':[173,216,230,140], 'lightgreen':[144,238,144,140], 'beige':[245,245,220,140]
 }
 
 # ---- SESSION STATE ----
-if 'base_layers_loaded' not in st.session_state:
-    st.session_state.base_layers_loaded = []
+if 'loaded_layers_cache' not in st.session_state:
+    st.session_state.loaded_layers_cache = {}
 if 'user_layers' not in st.session_state:
     st.session_state.user_layers = []
 if 'view_state' not in st.session_state:
@@ -61,51 +59,33 @@ def smart_simplify(gdf, tol_small=0.0001, tol_large=0.002):
 
 # ---- FUNCTION TO CALCULATE BOUNDS ----
 def get_bounds(gdf):
-    """Get the bounding box of a GeoDataFrame"""
-    bounds = gdf.total_bounds  # returns [minx, miny, maxx, maxy]
+    bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
     center_lon = (bounds[0] + bounds[2]) / 2
     center_lat = (bounds[1] + bounds[3]) / 2
-    
-    # Calculate zoom level based on bounds
     lon_diff = abs(bounds[2] - bounds[0])
     lat_diff = abs(bounds[3] - bounds[1])
     max_diff = max(lon_diff, lat_diff)
-    
-    # Simple zoom calculation
-    if max_diff > 10:
-        zoom = 5
-    elif max_diff > 5:
-        zoom = 6
-    elif max_diff > 2:
-        zoom = 7
-    elif max_diff > 1:
-        zoom = 8
-    elif max_diff > 0.5:
-        zoom = 9
-    elif max_diff > 0.1:
-        zoom = 11
-    elif max_diff > 0.05:
-        zoom = 12
-    else:
-        zoom = 13
-    
+    if max_diff > 10: zoom = 5
+    elif max_diff > 5: zoom = 6
+    elif max_diff > 2: zoom = 7
+    elif max_diff > 1: zoom = 8
+    elif max_diff > 0.5: zoom = 9
+    elif max_diff > 0.1: zoom = 11
+    elif max_diff > 0.05: zoom = 12
+    else: zoom = 13
     return center_lat, center_lon, zoom
 
-# ---- LOAD BASE LAYERS ----
-for base in BASE_GEOPACKAGES:
-    if not Path(base['path']).exists():
-        st.warning(f"GeoPackage not found: {base['path']}")
-        continue
-    for idx, layer_name in enumerate(base['layers']):
-        if any(l['name']==layer_name for l in st.session_state.base_layers_loaded):
-            continue
-        try:
-            gdf = gpd.read_file(base['path'], layer=layer_name).to_crs(epsg=4326)
-            gdf = smart_simplify(gdf)
-            color = COLOR_MAP[base['colors'][idx]]
-            st.session_state.base_layers_loaded.append({'name':layer_name,'data':gdf,'color':color})
-        except Exception as e:
-            st.error(f"Error loading {layer_name}: {e}")
+# ---- FUNCTION TO LOAD A LAYER ON-DEMAND ----
+@st.cache_data
+def load_layer(path, layer_name):
+    """Load and cache a single layer"""
+    try:
+        gdf = gpd.read_file(path, layer=layer_name).to_crs(epsg=4326)
+        gdf = smart_simplify(gdf)
+        return gdf
+    except Exception as e:
+        st.error(f"Error loading {layer_name}: {e}")
+        return None
 
 # ---- FILE UPLOAD ----
 uploaded_file = st.sidebar.file_uploader(
@@ -119,7 +99,6 @@ if uploaded_file:
     
     try:
         if tmp_ext == 'shp':
-            # --- Handle standalone .shp file ---
             st.warning("⚠️ Standalone .shp file detected. This may not work without .shx, .dbf, and .prj files.")
             st.info("💡 Tip: Zip all shapefile components (.shp, .shx, .dbf, .prj) together and upload the zip file for best results.")
             
@@ -131,7 +110,6 @@ if uploaded_file:
                 gdf = gpd.read_file(tmp_path).to_crs(epsg=4326)
                 gdf = smart_simplify(gdf)
                 
-                # Check if layer already exists
                 layer_name = uploaded_file.name
                 if not any(l['name'] == layer_name for l in st.session_state.user_layers):
                     st.session_state.user_layers.append({
@@ -141,15 +119,12 @@ if uploaded_file:
                     })
                     st.success(f"✓ {uploaded_file.name} loaded successfully!")
                     
-                    # Auto-zoom to uploaded layer
                     lat, lon, zoom = get_bounds(gdf)
                     st.session_state.view_state = {'latitude': lat, 'longitude': lon, 'zoom': zoom}
             except Exception as e:
                 st.error(f"Error reading standalone .shp file: {e}")
-                st.info("Please upload a zipped shapefile containing all components (.shp, .shx, .dbf, .prj)")
         
         elif tmp_ext == 'zip':
-            # --- Handle zipped shapefile ---
             with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
@@ -158,7 +133,6 @@ if uploaded_file:
                 extract_dir = tempfile.mkdtemp()
                 zip_ref.extractall(extract_dir)
                 
-                # Look for .shp
                 shp_files = list(Path(extract_dir).glob("**/*.shp"))
                 if not shp_files:
                     st.error("No .shp file found in the zip.")
@@ -166,7 +140,6 @@ if uploaded_file:
                     gdf = gpd.read_file(shp_files[0]).to_crs(epsg=4326)
                     gdf = smart_simplify(gdf)
                     
-                    # Check if layer already exists
                     layer_name = uploaded_file.name
                     if not any(l['name'] == layer_name for l in st.session_state.user_layers):
                         st.session_state.user_layers.append({
@@ -176,15 +149,12 @@ if uploaded_file:
                         })
                         st.success(f"✓ {uploaded_file.name} loaded successfully with {len(gdf)} features!")
                         
-                        # Auto-zoom to uploaded layer
                         lat, lon, zoom = get_bounds(gdf)
                         st.session_state.view_state = {'latitude': lat, 'longitude': lon, 'zoom': zoom}
                 
-                # Cleanup
                 shutil.rmtree(extract_dir, ignore_errors=True)
         
         elif tmp_ext == 'gpkg':
-            # --- Handle GeoPackage ---
             with tempfile.NamedTemporaryFile(delete=False, suffix=".gpkg") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
@@ -196,7 +166,6 @@ if uploaded_file:
                 gdf = gpd.read_file(tmp_path, layer=layer_sel).to_crs(epsg=4326)
                 gdf = smart_simplify(gdf)
                 
-                # Check if layer already exists
                 layer_name = f"{uploaded_file.name}-{layer_sel}"
                 if not any(l['name'] == layer_name for l in st.session_state.user_layers):
                     st.session_state.user_layers.append({
@@ -206,17 +175,50 @@ if uploaded_file:
                     })
                     st.success(f"✓ {layer_name} loaded successfully with {len(gdf)} features!")
                     
-                    # Auto-zoom to uploaded layer
                     lat, lon, zoom = get_bounds(gdf)
                     st.session_state.view_state = {'latitude': lat, 'longitude': lon, 'zoom': zoom}
     
     except Exception as e:
         st.error(f"Error reading file: {e}")
 
-# ---- LAYER VISIBILITY ----
-st.sidebar.header("SCL Layers")
-visible_base = {layer['name']:st.sidebar.checkbox(layer['name'], value=False, key=f"base_{layer['name']}") 
-                for layer in st.session_state.base_layers_loaded}
+# ---- LAYER VISIBILITY (with on-demand loading) ----
+st.sidebar.header("Base Constraint Layers")
+
+# Group layers by category
+env_layers = [l for l in BASE_GEOPACKAGES if 'environmental' in l['path'] or l['display_name'] in ['AONB', 'Country Parks', 'Local Nature Reserves', 'National Nature Reserves', 'National Parks', 'RAMSAR', 'SAC', 'SPA', 'SSSI']]
+scl_layers = [l for l in BASE_GEOPACKAGES if 'special_category' in l['path'] or l['display_name'] in ['Conservation Areas', 'CROW Act 2000', 'National Trust (Always Open)', 'National Trust (Limited Access)', 'Open Greenspace']]
+sensitive_layers = [l for l in BASE_GEOPACKAGES if 'Sensitive' in l['display_name']]
+
+visible_base_layers = {}
+
+with st.sidebar.expander("Environmental Designations", expanded=False):
+    for base in env_layers:
+        if Path(base['path']).exists():
+            visible_base_layers[base['display_name']] = st.checkbox(
+                base['display_name'], 
+                value=False, 
+                key=f"base_{base['display_name']}"
+            )
+
+with st.sidebar.expander("Special Category Land", expanded=False):
+    for base in scl_layers:
+        if Path(base['path']).exists():
+            visible_base_layers[base['display_name']] = st.checkbox(
+                base['display_name'], 
+                value=False, 
+                key=f"base_{base['display_name']}"
+            )
+
+with st.sidebar.expander("Sensitive Parties", expanded=False):
+    for base in sensitive_layers:
+        if Path(base['path']).exists():
+            # Sensitive_Parties has multiple layers
+            for idx, layer_name in enumerate(base['layers']):
+                visible_base_layers[layer_name] = st.checkbox(
+                    layer_name.replace('_', ' ').title(), 
+                    value=False, 
+                    key=f"base_{layer_name}"
+                )
 
 st.sidebar.header("Your Upload Layers")
 visible_user = {}
@@ -230,43 +232,36 @@ for idx, layer in enumerate(st.session_state.user_layers):
             st.session_state.view_state = {'latitude': lat, 'longitude': lon, 'zoom': zoom}
             st.rerun()
 
-# ---- ZOOM TO ALL VISIBLE LAYERS ----
-if st.sidebar.button("🌍 Zoom to All Visible Layers"):
-    all_visible_gdfs = []
-    
-    for layer in st.session_state.base_layers_loaded:
-        if visible_base.get(layer['name'], False):
-            all_visible_gdfs.append(layer['data'])
-    
-    for layer in st.session_state.user_layers:
-        if visible_user.get(layer['name'], True):
-            all_visible_gdfs.append(layer['data'])
-    
-    if all_visible_gdfs:
-        # Combine all visible layers
-        combined_gdf = gpd.GeoDataFrame(pd.concat(all_visible_gdfs, ignore_index=True))
-        lat, lon, zoom = get_bounds(combined_gdf)
-        st.session_state.view_state = {'latitude': lat, 'longitude': lon, 'zoom': zoom}
-        st.rerun()
-
-# ---- CREATE PYDECK LAYERS ----
+# ---- CREATE PYDECK LAYERS (only for visible/selected layers) ----
 deck_layers = []
 
-# Add base layers
-for layer in st.session_state.base_layers_loaded:
-    if visible_base.get(layer['name'], False):
-        deck_layers.append(pdk.Layer(
-            "GeoJsonLayer",
-            layer['data'].__geo_interface__,
-            stroked=True,
-            filled=True,
-            get_fill_color=layer['color'],
-            get_line_color=[0,0,0,255],
-            line_width_min_pixels=1,
-            pickable=True,
-            auto_highlight=True,
-            opacity=0.7
-        ))
+# Load and display base layers ONLY if selected
+for base in BASE_GEOPACKAGES:
+    if not Path(base['path']).exists():
+        continue
+    
+    for idx, layer_name in enumerate(base['layers']):
+        # Check if this layer is selected
+        is_visible = visible_base_layers.get(base['display_name'], False) or visible_base_layers.get(layer_name, False)
+        
+        if is_visible:
+            # Load layer on-demand (cached)
+            gdf = load_layer(base['path'], layer_name)
+            
+            if gdf is not None:
+                color = COLOR_MAP[base['colors'][idx]]
+                deck_layers.append(pdk.Layer(
+                    "GeoJsonLayer",
+                    gdf.__geo_interface__,
+                    stroked=True,
+                    filled=True,
+                    get_fill_color=color,
+                    get_line_color=[0,0,0,255],
+                    line_width_min_pixels=1,
+                    pickable=True,
+                    auto_highlight=True,
+                    opacity=0.7
+                ))
 
 # Add user layers
 for layer in st.session_state.user_layers:
@@ -292,28 +287,19 @@ view_state = pdk.ViewState(
     pitch=0
 )
 
-# ---- RENDER MAP WITH LIGHT BASEMAP ----
-if deck_layers or True:  # Always show map
-    r = pdk.Deck(
-        layers=deck_layers,
-        initial_view_state=view_state,
-        map_style='https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',  # Light CartoDB basemap
-        tooltip={"text": "{name}"}
-    )
-    st.pydeck_chart(r, use_container_width=True)
-else:
-    st.info("Select at least one layer to display.")
+# ---- RENDER MAP ----
+r = pdk.Deck(
+    layers=deck_layers,
+    initial_view_state=view_state,
+    map_style='https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    tooltip=True
+)
+st.pydeck_chart(r, use_container_width=True)
 
-# ---- INFO SECTION ----
+# ---- INFO ----
 st.sidebar.markdown("---")
-st.sidebar.info("""
-**Map Controls:**
-- 🔍 Click zoom button next to your upload layer to center on it
-- 🌍 Use 'Zoom to All Visible' to see all layers visible
-- Drag to pan, scroll to zoom
+st.sidebar.info(f"""
+**Layers loaded:** {len(deck_layers)}
 
-**Basemap Options:**
-Current: CartoDB Positron (light)
-
-**Tip:** For shapefiles, zip all components together (.shp, .shx, .dbf, .prj)
+💡 **Tip:** Select only the layers you need to improve performance.
 """)
