@@ -1,0 +1,194 @@
+# Land Constraint Checker
+
+## Overview
+
+The **Land Constraint Checker** is a web-based interactive mapping application built using **Streamlit**, **GeoPandas**, and **Pydeck**. The tool allows users to visualise multiple land constraint datasets together with user-supplied spatial data (upload) in order to support early-stage land screening and planning analysis.
+
+The application is designed to be lightweight for end users (accessed via a web link) while handling relatively large spatial datasets on the server side.
+
+---
+
+## What This App Does
+
+* Displays multiple UK Special Category Land and Cronw Land datasets (environmental designations, special category land, sensitive parties)
+* Allows users to toggle individual constraint layers on/off
+* Supports user uploads of:
+
+  * Zipped shapefiles
+  * GeoPackages
+* Automatically zooms to uploaded or selected layers
+* Uses geometry simplification and lazy loading to keep performance acceptable in a browser layers only load when users check the checkbox)
+
+---
+
+## Technical setup
+
+### Streamlit
+
+Streamlit is used as the **web application framework**.
+
+It handles:
+
+* Page layout and UI components (sidebar, checkboxes, buttons)
+* User interaction (file uploads, layer toggling, zoom controls)
+* Session state management (remembering which layers are loaded or visible)
+
+Streamlit Cloud is used for deployment, providing:
+
+* A public URL
+* Automatic app restarts on GitHub updates
+* Managed Python environment
+
+---
+
+### GeoPandas (Python Package)
+
+GeoPandas is used for **spatial data processing**.
+
+It handles:
+
+* Reading GeoPackages and shapefiles
+* Coordinate reference system conversion (to WGS84 / EPSG:4326)
+* Geometry simplification to reduce data size
+* Calculating bounds for map zooming
+
+All spatial operations happen **server-side** before data is sent to the browser.
+
+---
+
+### Pydeck (Python Package)
+
+Pydeck is used for **map rendering**.
+
+It:
+
+* Converts GeoDataFrames into browser-renderable GeoJSON
+* Renders vector layers using WebGL
+* Supports interactive features such as hover, highlighting, and layer toggling
+
+Pydeck is responsible for most performance constraints, as large GeoJSON payloads can exceed browser or Streamlit message size limits.
+
+---
+
+### GitHub
+
+GitHub is used as the **source control and deployment trigger**.
+
+It provides:
+
+* Version history of the codebase
+* Centralised storage of scripts and configuration files
+* Automatic redeployment to Streamlit Cloud when changes are pushed
+
+The repository structure also documents how data and scripts are organised.
+
+---
+
+## Data Organisation
+
+Spatial data is stored locally within the repository under:
+
+```
+custom_repository/data/
+```
+
+Each constraint type is stored as an individual GeoPackage to reduce memory load and allow selective loading.
+
+Examples:
+
+* `AONB.gpkg`
+* `SSSI.gpkg`
+* `Crow_act_2000.gpkg`
+
+Some GeoPackages contain multiple layers (e.g. Sensitive Parties) -- only suitable when the layers don't take up large storage <60MB for 4 layers)
+
+---
+
+## Methods
+
+### 1. Layer Splitting
+
+Originally, several datasets were stored as large multi-layer GeoPackages (>300 MB). These were split into smaller, single-layer GeoPackages to:
+
+* Reduce load times
+* Improve deployment reliability
+* Allow selective loading of heavy datasets
+
+---
+
+### 2. Geometry Simplification
+
+Geometry simplification was applied using GeoPandas:
+
+* Light simplification for smaller layers
+* More aggressive simplification for large polygon datasets
+
+This reduces vertex counts while preserving overall shape and topology, improving rendering performance.
+
+---
+
+### 3. Lazy Loading
+
+To avoid exceeding Streamlit’s 200 MB message size limit:
+
+* Not all base layers are loaded at app startup
+* Large layers are only read and sent to the browser **when the user explicitly enables them**
+
+This significantly reduces initial load time and prevents browser crashes.
+
+---
+
+### 4. Coordinate Standardisation
+
+All datasets are reprojected to **EPSG:4326 (WGS84)** to ensure compatibility with web mapping and Pydeck.
+
+---
+
+## Data Limitations
+
+* **Simplification reduces geometric accuracy**: boundaries may not exactly match authoritative datasets
+* **Not suitable for legal or regulatory decisions**
+* Dataset freshness depends on source update frequency
+* Attribute schemas may vary between layers
+* Performance may degrade if multiple large layers are enabled simultaneously
+
+This tool is intended for **screening and exploratory analysis only**.
+
+---
+
+## Performance Considerations
+
+* Very large GeoPackages (>100 MB) can still cause slow rendering
+* Users are encouraged to:
+
+  * Enable only the layers they need
+  * Upload simplified or clipped datasets where possible
+
+---
+
+## Future Improvements
+
+Potential areas for enhancement:
+
+* Server-side spatial indexing
+* Vector tile generation instead of GeoJSON
+* Bounding-box based loading
+* User-controlled simplification tolerance
+* Caching frequently used layers
+* Metadata display per layer
+
+---
+
+## Notes
+
+This project serves as:
+
+* A working internal spatial screening tool
+* A record of design decisions and technical constraints
+* A foundation for future optimisation or migration to more scalable architectures
+
+---
+
+## Disclaimer
+
+This application is provided for internal use and exploratory analysis only. No warranty is given regarding data accuracy or completeness.
