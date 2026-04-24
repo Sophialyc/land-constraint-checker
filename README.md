@@ -3,11 +3,11 @@
 A Streamlit web application for visualizing land constraints and special category land designations in the UK.
 
 ## Features
-- 🗺️ Interactive map with multiple constraint layers
-- 📤 Upload and overlay custom shapefiles or GeoPackages
-- 🔍 Zoom to layer functionality
-- 🎨 Light, clean CartoDB basemap
-- 📊 View multiple environmental and planning designations
+-  Interactive map with multiple constraint layers
+-  Upload and overlay custom shapefiles or GeoPackages
+-  Zoom to layer functionality
+-  Light, clean CartoDB basemap
+-  View multiple environmental and planning designations
 
 ## Data Layers
 
